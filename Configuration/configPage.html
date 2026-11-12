@@ -498,6 +498,7 @@
                     <div class="ssp-search-row">
                         <input id="sspSearchInput" type="search" placeholder="Search movies, episodes, videos..." autocomplete="off">
                         <button id="sspSearchBtn" type="button">Search</button>
+                        <button id="sspAddAllBtn" type="button" class="ssp-secondary" disabled>Add all</button>
                     </div>
                     <div id="sspSearchResults" class="ssp-list">
                         <div class="ssp-empty">Type a search term to find videos to add.</div>
@@ -688,11 +689,35 @@
             }
 
             function setBusy(value) {
-                busy = value;
-                var buttons = root.querySelectorAll("button");
+                busy = !!value;
+                var buttons = root.querySelectorAll("button, input, select");
                 for (var i = 0; i < buttons.length; i++) {
-                    buttons[i].disabled = value;
+                    var element = buttons[i];
+                    if (element.id === "sspPlaylistName" || element.id === "sspThreshold"
+                        || element.id === "sspCooldown" || element.id === "sspShared"
+                        || element.id === "sspAutoReset" || element.id === "sspSkipOnly"
+                        || element.id === "sspAutoDedupe") {
+                        if (!isAdmin) {
+                            element.disabled = true;
+                            continue;
+                        }
+                    }
+                    element.disabled = busy;
                 }
+
+                if (!busy && !isAdmin) {
+                    el("sspSaveSettingsBtn").disabled = true;
+                    el("sspCleanupBtn").disabled = true;
+                    el("sspPlaylistName").disabled = true;
+                    el("sspThreshold").disabled = true;
+                    el("sspCooldown").disabled = true;
+                    el("sspShared").disabled = true;
+                    el("sspAutoReset").disabled = true;
+                    el("sspSkipOnly").disabled = true;
+                    el("sspAutoDedupe").disabled = true;
+                }
+
+                updateAddAllState();
             }
 
             function formatRuntime(ticks) {
@@ -788,27 +813,44 @@
                 }
             }
 
-            function renderSearchResults() {
-                var container = el("sspSearchResults");
-                if (!searchItems || searchItems.length === 0) {
-                    container.innerHTML = '<div class="ssp-empty">No matching videos found.</div>';
-                    return;
-                }
-
+            function getVisibleSearchItems() {
                 var playlistKeys = {};
                 (currentStatus.items || []).forEach(function (item) {
                     playlistKeys[itemKey(item)] = true;
                 });
 
-                var html = "";
-                searchItems.forEach(function (item) {
-                    var key = itemKey(item);
-                    var runtime = formatRuntime(item.RunTimeTicks);
-                    var alreadyAdded = !!playlistKeys[key];
-                    var button = alreadyAdded
-                        ? '<button type="button" class="ssp-secondary ssp-small" disabled>Added</button>'
-                        : '<button type="button" class="ssp-small" data-ssp-add="' + escapeHtml(item.Id) + '">Add</button>';
+                return (searchItems || []).filter(function (item) {
+                    return !playlistKeys[itemKey(item)];
+                });
+            }
 
+            function updateAddAllState() {
+                var button = el("sspAddAllBtn");
+                if (!button) {
+                    return;
+                }
+
+                button.disabled = busy || getVisibleSearchItems().length === 0;
+            }
+
+            function renderSearchResults() {
+                var container = el("sspSearchResults");
+                if (!searchItems || searchItems.length === 0) {
+                    container.innerHTML = '<div class="ssp-empty">No matching videos found.</div>';
+                    updateAddAllState();
+                    return;
+                }
+
+                var visibleItems = getVisibleSearchItems();
+                if (visibleItems.length === 0) {
+                    container.innerHTML = '<div class="ssp-empty">All matching videos are already in the playlist.</div>';
+                    updateAddAllState();
+                    return;
+                }
+
+                var html = "";
+                visibleItems.forEach(function (item) {
+                    var runtime = formatRuntime(item.RunTimeTicks);
                     html += '<div class="ssp-row">' +
                         '<div class="ssp-row-main">' +
                             '<div class="ssp-row-title">' + escapeHtml(item.Name || "(untitled)") + '</div>' +
@@ -817,7 +859,7 @@
                                 (runtime ? '<span>' + escapeHtml(runtime) + '</span>' : '') +
                             '</div>' +
                         '</div>' +
-                        button +
+                        '<button type="button" class="ssp-small" data-ssp-add="' + escapeHtml(item.Id) + '">Add</button>' +
                     '</div>';
                 });
 
@@ -828,6 +870,8 @@
                         addItem(this.getAttribute("data-ssp-add"));
                     });
                 }
+
+                updateAddAllState();
             }
 
             function escapeHtml(value) {
@@ -862,12 +906,39 @@
                 setBusy(true);
                 try {
                     currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: [itemId] }));
+                    searchItems = (searchItems || []).filter(function (item) {
+                        return itemKey(item) !== String(itemId).toLowerCase();
+                    });
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
                     setMessage("Video added to the playlist.", "success");
                 } catch (error) {
                     setMessage("Could not add the video: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function addAllItems() {
+                var items = getVisibleSearchItems();
+                if (!items.length || busy) {
+                    return;
+                }
+
+                var ids = items.map(function (item) { return item.Id; });
+                setBusy(true);
+                try {
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: ids }));
+                    searchItems = (searchItems || []).filter(function (item) {
+                        return ids.indexOf(item.Id) === -1;
+                    });
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage(ids.length + " video(s) added to the playlist.", "success");
+                } catch (error) {
+                    setMessage("Could not add videos: " + error.message, "error");
                 } finally {
                     setBusy(false);
                 }
@@ -1061,6 +1132,7 @@
             el("sspSearchBtn").addEventListener("click", function () {
                 search(el("sspSearchInput").value);
             });
+            el("sspAddAllBtn").addEventListener("click", addAllItems);
 
             el("sspSearchInput").addEventListener("input", function () {
                 var value = this.value;
