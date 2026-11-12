@@ -137,6 +137,36 @@
         }
     }
 
+    function hideGlobalPlaylistStats() {
+        var infoSelectors = [
+            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-primary .mediaInfoItem',
+            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-secondary .mediaInfoItem',
+            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-primary',
+            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-secondary'
+        ];
+
+        infoSelectors.forEach(function (selector) {
+            var nodes = document.querySelectorAll(selector);
+            for (var i = 0; i < nodes.length; i++) {
+                var node = nodes[i];
+                var text = (node.textContent || '').toLowerCase();
+                if (text.indexOf('watched') !== -1 || text.indexOf('unwatched') !== -1 || text.indexOf('unplayed') !== -1) {
+                    node.style.display = 'none';
+                    node.dataset.sspHiddenGlobal = '1';
+                }
+            }
+        });
+
+        var coverIndicators = document.querySelectorAll(
+            '.detailPagePrimaryContainer .detailImageContainer .playedIndicator, ' +
+            '.detailPagePrimaryContainer .detailImageContainer .countIndicator'
+        );
+        for (var j = 0; j < coverIndicators.length; j++) {
+            coverIndicators[j].style.display = 'none';
+            coverIndicators[j].dataset.sspHiddenGlobal = '1';
+        }
+    }
+
     function render(status) {
         var itemId = getItemIdFromRoute();
         var playlistId = status && status.PlaylistId ? String(status.PlaylistId).toLowerCase() : null;
@@ -157,6 +187,7 @@
         var key = percent + '|' + played + '|' + total + '|' + remaining;
 
         syncListItemStates(status);
+        hideGlobalPlaylistStats();
 
         var container = document.getElementById(CONTAINER_ID);
         var bar = document.getElementById(BAR_ID);
