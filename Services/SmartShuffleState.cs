@@ -12,4 +12,6 @@ public sealed class SmartShuffleState
 public sealed class UserPlaylistState
 {
     public string? PlaylistId { get; set; }
+
+    public HashSet<string> PlayedItemIds { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }

@@ -28,7 +28,6 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
     private readonly IPlaylistManager _playlistManager;
     private readonly ISessionManager _sessionManager;
     private readonly IUserManager _userManager;
-    private readonly IUserDataManager _userDataManager;
     private readonly ILogger<SmartShuffleService> _logger;
     private readonly string _stateFilePath;
     private readonly SemaphoreSlim _stateLock = new(1, 1);
@@ -41,14 +40,12 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
         IPlaylistManager playlistManager,
         ISessionManager sessionManager,
         IUserManager userManager,
-        IUserDataManager userDataManager,
         IApplicationPaths applicationPaths,
         ILogger<SmartShuffleService> logger)
     {
         _playlistManager = playlistManager;
         _sessionManager = sessionManager;
         _userManager = userManager;
-        _userDataManager = userDataManager;
         _logger = logger;
         _stateFilePath = Path.Combine(applicationPaths.PluginConfigurationsPath, "SmartShufflePlaylist.state.json");
     }
@@ -117,9 +114,12 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
     public async Task<PlaylistStatus> GetStatusAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var playlist = await EnsurePlaylistAsync(userId, cancellationToken).ConfigureAwait(false);
-        var user = _userManager.GetUserById(userId)
+        _ = _userManager.GetUserById(userId)
             ?? throw new InvalidOperationException("The user could not be loaded.");
         var items = GetPlaylistItems(playlist);
+        var state = await LoadStateAsync(cancellationToken).ConfigureAwait(false);
+        var userState = GetUserState(state, userId);
+        var playedSet = userState.PlayedItemIds ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var statusItems = items
             .Select(item => new PlaylistStatusItem
@@ -127,7 +127,7 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
                 Id = ToKey(item.Id),
                 Name = item.Name,
                 RunTimeTicks = item.RunTimeTicks,
-                Played = _userDataManager.GetUserData(user, item.Item)?.Played == true
+                Played = playedSet.Contains(ToKey(item.Id))
             })
             .ToList();
 
@@ -179,10 +179,10 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
     public async Task ResetAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var playlist = await EnsurePlaylistAsync(userId, cancellationToken).ConfigureAwait(false);
-        var user = _userManager.GetUserById(userId)
+        _ = _userManager.GetUserById(userId)
             ?? throw new InvalidOperationException("The user could not be loaded.");
 
-        ResetUserData(user, GetPlaylistItems(playlist));
+        await ResetPlaylistProgressAsync(userId, GetPlaylistItems(playlist), cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Reset {Playlist} progress for user {User}.", GetPlaylistName(), userId);
     }
 
@@ -468,8 +468,10 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
                 continue;
             }
 
-            var playedCount = items.Count(item =>
-                _userDataManager.GetUserData(userEntity, item.Item)?.Played == true);
+            var state = await LoadStateAsync(CancellationToken.None).ConfigureAwait(false);
+            var userState = GetUserState(state, user.Id);
+            var playedSet = userState.PlayedItemIds ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var playedCount = items.Count(item => playedSet.Contains(ToKey(item.Id)));
 
             if (playedCount >= items.Count)
             {
@@ -482,7 +484,10 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
                 }
                 else
                 {
-                    ResetUserData(userEntity, items);
+                    await ResetPlaylistProgressAsync(user.Id, items, CancellationToken.None).ConfigureAwait(false);
+                    state = await LoadStateAsync(CancellationToken.None).ConfigureAwait(false);
+                    userState = GetUserState(state, user.Id);
+                    playedSet = userState.PlayedItemIds ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     _logger.LogInformation(
                         "All items in {Playlist} have been played for user {User}; resetting the cycle.",
                         GetPlaylistName(),
@@ -491,8 +496,7 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
                 }
             }
 
-            var currentData = _userDataManager.GetUserData(userEntity, e.Item);
-            if (currentData?.Played == true)
+            if (playedSet.Contains(ToKey(e.Item.Id)))
             {
                 await SkipToNextAsync(e.Session, user.Id, e.Item).ConfigureAwait(false);
             }
@@ -533,19 +537,11 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
                 continue;
             }
 
-            var userData = _userDataManager.GetUserData(userEntity, e.Item);
-            if (userData == null || userData.Played)
+            var marked = await MarkItemPlayedAsync(user.Id, e.Item.Id, CancellationToken.None).ConfigureAwait(false);
+            if (!marked)
             {
                 continue;
             }
-
-            userData.Played = true;
-            _userDataManager.SaveUserData(
-                userEntity,
-                e.Item,
-                userData,
-                playedToCompletion ? UserDataSaveReason.PlaybackFinished : UserDataSaveReason.PlaybackProgress,
-                CancellationToken.None);
 
             _logger.LogInformation(
                 "Marked {Item} as played for user {User} in {Playlist}.",
@@ -614,25 +610,40 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
         return items;
     }
 
-    private void ResetUserData(User user, IEnumerable<PlaylistItemInfo> items)
+    private Task<bool> MarkItemPlayedAsync(Guid userId, Guid itemId, CancellationToken cancellationToken)
     {
-        foreach (var item in items)
+        var key = ToKey(itemId);
+        return UpdateStateAsync(state =>
         {
-            var userData = _userDataManager.GetUserData(user, item.Item);
-            if (userData == null || (!userData.Played && userData.PlaybackPositionTicks == 0))
+            var userState = GetUserState(state, userId);
+            userState.PlayedItemIds ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            return userState.PlayedItemIds.Add(key);
+        }, cancellationToken);
+    }
+
+    private Task ResetPlaylistProgressAsync(Guid userId, IEnumerable<PlaylistItemInfo> items, CancellationToken cancellationToken)
+    {
+        var itemKeys = items.Select(item => ToKey(item.Id)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return UpdateStateAsync(state =>
+        {
+            var userState = GetUserState(state, userId);
+            if (userState.PlayedItemIds == null || userState.PlayedItemIds.Count == 0)
             {
-                continue;
+                return false;
             }
 
-            userData.Played = false;
-            userData.PlaybackPositionTicks = 0;
-            _userDataManager.SaveUserData(
-                user,
-                item.Item,
-                userData,
-                UserDataSaveReason.TogglePlayed,
-                CancellationToken.None);
-        }
+            var before = userState.PlayedItemIds.Count;
+            if (itemKeys.Count == 0)
+            {
+                userState.PlayedItemIds.Clear();
+            }
+            else
+            {
+                userState.PlayedItemIds.RemoveWhere(itemKeys.Contains);
+            }
+
+            return userState.PlayedItemIds.Count != before;
+        }, cancellationToken);
     }
 
     private async Task<SmartShuffleState> LoadStateAsync(CancellationToken cancellationToken)
