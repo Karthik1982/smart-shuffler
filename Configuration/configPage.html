@@ -496,10 +496,16 @@
                 <section class="ssp-card">
                     <h2>Add videos</h2>
                     <div class="ssp-search-row">
-                        <input id="sspSearchInput" type="search" placeholder="Search movies, episodes, videos..." autocomplete="off">
+                        <input id="sspSearchInput" type="search" placeholder="Search movies, episodes, videos (* for all)..." autocomplete="off">
                         <button id="sspSearchBtn" type="button">Search</button>
-                        <button id="sspAddAllBtn" type="button" class="ssp-secondary" disabled>Add all</button>
                     </div>
+                    <div class="ssp-search-row">
+                        <button id="sspSelectVisibleBtn" type="button" class="ssp-secondary ssp-small" disabled>Select visible</button>
+                        <button id="sspAddSelectedBtn" type="button" class="ssp-small" disabled>Add selected</button>
+                        <button id="sspAddAllMatchingBtn" type="button" class="ssp-secondary ssp-small" disabled>Add all matching</button>
+                        <button id="sspLoadMoreBtn" type="button" class="ssp-secondary ssp-small" disabled>Load more</button>
+                    </div>
+                    <p id="sspSearchMeta" class="ssp-muted">Type a search term, or use * to browse all videos.</p>
                     <div id="sspSearchResults" class="ssp-list">
                         <div class="ssp-empty">Type a search term to find videos to add.</div>
                     </div>
@@ -528,7 +534,13 @@
             var pluginId = "7a28699c-e118-4666-84a0-e106de3866fa";
             var currentStatus = { total: 0, played: 0, remaining: 0, items: [] };
             var searchItems = [];
+            var selectedKeys = {};
             var searchTimer = null;
+            var searchQuery = "";
+            var searchTotal = 0;
+            var searchStartIndex = 0;
+            var searchPageSize = 50;
+            var searchLoading = false;
             var busy = false;
             var isAdmin = false;
 
@@ -824,34 +836,86 @@
                 });
             }
 
-            function updateAddAllState() {
-                var button = el("sspAddAllBtn");
-                if (!button) {
-                    return;
-                }
+            function getSelectedVisibleItems() {
+                return getVisibleSearchItems().filter(function (item) {
+                    return !!selectedKeys[itemKey(item)];
+                });
+            }
 
-                button.disabled = busy || getVisibleSearchItems().length === 0;
+            function syncSelection() {
+                var visibleKeys = {};
+                getVisibleSearchItems().forEach(function (item) {
+                    visibleKeys[itemKey(item)] = true;
+                });
+                Object.keys(selectedKeys).forEach(function (key) {
+                    if (!visibleKeys[key]) {
+                        delete selectedKeys[key];
+                    }
+                });
+            }
+
+            function updateSearchControls() {
+                var visible = getVisibleSearchItems();
+                var selected = getSelectedVisibleItems();
+                var canLoadMore = searchQuery !== "" && (searchStartIndex + searchItems.length) < searchTotal;
+                var addSelectedBtn = el("sspAddSelectedBtn");
+                var selectVisibleBtn = el("sspSelectVisibleBtn");
+                var addAllMatchingBtn = el("sspAddAllMatchingBtn");
+                var loadMoreBtn = el("sspLoadMoreBtn");
+                var meta = el("sspSearchMeta");
+
+                if (selectVisibleBtn) { selectVisibleBtn.disabled = busy || searchLoading || visible.length === 0; }
+                if (addSelectedBtn) {
+                    addSelectedBtn.disabled = busy || searchLoading || selected.length === 0;
+                    addSelectedBtn.textContent = selected.length ? ("Add selected (" + selected.length + ")") : "Add selected";
+                }
+                if (addAllMatchingBtn) {
+                    var remaining = Math.max(0, searchTotal - (currentStatus.total || 0));
+                    addAllMatchingBtn.disabled = busy || searchLoading || !searchQuery || remaining <= 0;
+                    addAllMatchingBtn.textContent = remaining > 0 && searchQuery ? ("Add all matching (" + remaining + ")") : "Add all matching";
+                }
+                if (loadMoreBtn) {
+                    loadMoreBtn.disabled = busy || searchLoading || !canLoadMore;
+                    loadMoreBtn.textContent = canLoadMore ? ("Load more (" + (searchStartIndex + searchItems.length) + "/" + searchTotal + ")") : "Load more";
+                }
+                if (meta) {
+                    if (!searchQuery) {
+                        meta.textContent = "Type a search term, or use * to browse all videos.";
+                    } else {
+                        meta.textContent = "Showing " + visible.length + " of " + searchItems.length + " loaded (total matches: " + searchTotal + ", in playlist: " + (currentStatus.total || 0) + ").";
+                    }
+                }
             }
 
             function renderSearchResults() {
                 var container = el("sspSearchResults");
                 if (!searchItems || searchItems.length === 0) {
-                    container.innerHTML = '<div class="ssp-empty">No matching videos found.</div>';
-                    updateAddAllState();
+                    container.innerHTML = searchQuery
+                        ? '<div class="ssp-empty">No matching videos found.</div>'
+                        : '<div class="ssp-empty">Type a search term to find videos to add.</div>';
+                    syncSelection();
+                    updateSearchControls();
                     return;
                 }
 
                 var visibleItems = getVisibleSearchItems();
+                syncSelection();
                 if (visibleItems.length === 0) {
-                    container.innerHTML = '<div class="ssp-empty">All matching videos are already in the playlist.</div>';
-                    updateAddAllState();
+                    var canLoadMore = (searchStartIndex + searchItems.length) < searchTotal;
+                    container.innerHTML = '<div class="ssp-empty">' + (canLoadMore
+                        ? 'All loaded videos are already in the playlist. Load more to see additional results.'
+                        : 'All matching videos are already in the playlist.') + '</div>';
+                    updateSearchControls();
                     return;
                 }
 
                 var html = "";
                 visibleItems.forEach(function (item) {
+                    var key = itemKey(item);
                     var runtime = formatRuntime(item.RunTimeTicks);
+                    var checked = selectedKeys[key] ? " checked" : "";
                     html += '<div class="ssp-row">' +
+                        '<label style="display:flex;align-items:center;margin-right:.5em;"><input type="checkbox" data-ssp-select="' + escapeHtml(key) + '"' + checked + '></label>' +
                         '<div class="ssp-row-main">' +
                             '<div class="ssp-row-title">' + escapeHtml(item.Name || "(untitled)") + '</div>' +
                             '<div class="ssp-row-sub">' +
@@ -864,14 +928,22 @@
                 });
 
                 container.innerHTML = html;
-                var buttons = container.querySelectorAll("[data-ssp-add]");
-                for (var i = 0; i < buttons.length; i++) {
-                    buttons[i].addEventListener("click", function () {
+                var addButtons = container.querySelectorAll("[data-ssp-add]");
+                for (var i = 0; i < addButtons.length; i++) {
+                    addButtons[i].addEventListener("click", function () {
                         addItem(this.getAttribute("data-ssp-add"));
                     });
                 }
+                var checks = container.querySelectorAll("[data-ssp-select]");
+                for (var j = 0; j < checks.length; j++) {
+                    checks[j].addEventListener("change", function () {
+                        var k = this.getAttribute("data-ssp-select");
+                        if (this.checked) { selectedKeys[k] = true; } else { delete selectedKeys[k]; }
+                        updateSearchControls();
+                    });
+                }
 
-                updateAddAllState();
+                updateSearchControls();
             }
 
             function escapeHtml(value) {
@@ -909,6 +981,7 @@
                     searchItems = (searchItems || []).filter(function (item) {
                         return itemKey(item) !== String(itemId).toLowerCase();
                     });
+                    syncSelection();
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
@@ -920,8 +993,8 @@
                 }
             }
 
-            async function addAllItems() {
-                var items = getVisibleSearchItems();
+            async function addSelectedItems() {
+                var items = getSelectedVisibleItems();
                 if (!items.length || busy) {
                     return;
                 }
@@ -933,6 +1006,7 @@
                     searchItems = (searchItems || []).filter(function (item) {
                         return ids.indexOf(item.Id) === -1;
                     });
+                    syncSelection();
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
@@ -942,6 +1016,13 @@
                 } finally {
                     setBusy(false);
                 }
+            }
+
+            function selectVisibleItems() {
+                getVisibleSearchItems().forEach(function (item) {
+                    selectedKeys[itemKey(item)] = true;
+                });
+                renderSearchResults();
             }
 
             async function removeItem(itemId) {
@@ -1078,48 +1159,151 @@
                 }
             }
 
-            async function search(term) {
-                var query = (term || "").trim();
-                if (!query) {
-                    searchItems = [];
-                    el("sspSearchResults").innerHTML =
-                        '<div class="ssp-empty">Type a search term to find videos to add.</div>';
-                    return;
-                }
-
+            function buildSearchParams(query, startIndex) {
                 var client = getApiClient();
                 var userId = "";
                 if (client && typeof client.getCurrentUserId === "function") {
-                    try {
-                        userId = client.getCurrentUserId();
-                    } catch (e) { /* ignore */ }
+                    try { userId = client.getCurrentUserId(); } catch (e) { /* ignore */ }
                 }
 
                 var params = {
-                    searchTerm: query,
                     recursive: "true",
                     includeItemTypes: "Movie,Episode,Video,MusicVideo",
-                    limit: "30",
+                    limit: String(searchPageSize),
+                    startIndex: String(startIndex || 0),
                     fields: "RunTimeTicks",
                     sortBy: "SortName",
                     sortOrder: "Ascending"
                 };
 
+                if (query && query !== "*") {
+                    params.searchTerm = query;
+                }
+
                 if (userId) {
                     params.userId = userId;
                 }
 
+                return params;
+            }
+
+            function dedupeByKey(items) {
+                var seen = {};
+                var result = [];
+                (items || []).forEach(function (item) {
+                    var key = itemKey(item);
+                    if (!key || seen[key]) { return; }
+                    seen[key] = true;
+                    result.push(item);
+                });
+                return result;
+            }
+
+            async function fetchSearchPage(query, startIndex, append) {
+                searchLoading = true;
+                updateSearchControls();
                 setBusy(true);
                 try {
-                    var result = await apiRequest("GET", "Items", undefined, params);
-
-                    searchItems = result && result.Items ? result.Items : [];
+                    var result = await apiRequest("GET", "Items", undefined, buildSearchParams(query, startIndex));
+                    var items = result && result.Items ? result.Items : [];
+                    searchTotal = Number(result && (result.TotalRecordCount !== undefined ? result.TotalRecordCount : result.totalRecordCount || 0));
+                    searchItems = append ? dedupeByKey(searchItems.concat(items)) : items;
+                    searchStartIndex = startIndex || 0;
                     renderSearchResults();
                     setMessage("", "");
                 } catch (error) {
-                    searchItems = [];
+                    if (!append) {
+                        searchItems = [];
+                        searchTotal = 0;
+                        searchStartIndex = 0;
+                    }
                     renderSearchResults();
                     setMessage("Search failed: " + error.message, "error");
+                } finally {
+                    searchLoading = false;
+                    setBusy(false);
+                }
+            }
+
+            async function search(term) {
+                var query = (term || "").trim();
+                if (!query) {
+                    searchQuery = "";
+                    searchItems = [];
+                    searchTotal = 0;
+                    searchStartIndex = 0;
+                    selectedKeys = {};
+                    renderSearchResults();
+                    return;
+                }
+
+                searchQuery = query;
+                selectedKeys = {};
+                await fetchSearchPage(searchQuery, 0, false);
+            }
+
+            async function loadMoreResults() {
+                if (!searchQuery || searchLoading || busy) {
+                    return;
+                }
+
+                var nextIndex = searchStartIndex + searchItems.length;
+                if (nextIndex >= searchTotal) {
+                    return;
+                }
+
+                await fetchSearchPage(searchQuery, nextIndex, true);
+            }
+
+            async function addAllMatching() {
+                if (!searchQuery || busy) {
+                    return;
+                }
+
+                if (!window.confirm("Add all matching videos to the playlist? This may take a while for large libraries.")) {
+                    return;
+                }
+
+                setBusy(true);
+                var added = 0;
+                try {
+                    var startIndex = 0;
+                    while (true) {
+                        var result = await apiRequest("GET", "Items", undefined, buildSearchParams(searchQuery, startIndex));
+                        var items = result && result.Items ? result.Items : [];
+                        var total = Number(result && (result.TotalRecordCount !== undefined ? result.TotalRecordCount : result.totalRecordCount || 0));
+                        if (!items.length) {
+                            break;
+                        }
+
+                        var playlistKeys = {};
+                        (currentStatus.items || []).forEach(function (item) { playlistKeys[itemKey(item)] = true; });
+                        var ids = items.filter(function (item) { return !playlistKeys[itemKey(item)]; }).map(function (item) { return item.Id; });
+
+                        if (ids.length) {
+                            currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: ids }));
+                            added += ids.length;
+                        }
+
+                        startIndex += items.length;
+                        if (startIndex >= total) {
+                            break;
+                        }
+                    }
+
+                    searchItems = (searchItems || []).filter(function (item) {
+                        return !(currentStatus.items || []).some(function (p) { return itemKey(p) === itemKey(item); });
+                    });
+                    selectedKeys = {};
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage(added + " video(s) added to the playlist.", "success");
+                } catch (error) {
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage("Added " + added + " video(s) before error: " + error.message, added > 0 ? "success" : "error");
                 } finally {
                     setBusy(false);
                 }
@@ -1132,7 +1316,10 @@
             el("sspSearchBtn").addEventListener("click", function () {
                 search(el("sspSearchInput").value);
             });
-            el("sspAddAllBtn").addEventListener("click", addAllItems);
+            el("sspSelectVisibleBtn").addEventListener("click", selectVisibleItems);
+            el("sspAddSelectedBtn").addEventListener("click", addSelectedItems);
+            el("sspAddAllMatchingBtn").addEventListener("click", addAllMatching);
+            el("sspLoadMoreBtn").addEventListener("click", loadMoreResults);
 
             el("sspSearchInput").addEventListener("input", function () {
                 var value = this.value;
