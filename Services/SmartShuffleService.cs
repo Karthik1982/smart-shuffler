@@ -202,6 +202,7 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
             if (existing != null)
             {
                 await CachePlaylistIdAsync(userId, existing.Id, cancellationToken).ConfigureAwait(false);
+                existing = await RenameIfNeededAsync(existing, userId, cancellationToken).ConfigureAwait(false);
                 return await PreparePlaylistAsync(existing, userId, cancellationToken, false).ConfigureAwait(false);
             }
 
@@ -229,6 +230,44 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
         finally
         {
             _ensureLock.Release();
+        }
+    }
+
+    private async Task<Playlist> RenameIfNeededAsync(
+        Playlist playlist,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var desiredName = GetPlaylistName();
+        if (string.Equals(playlist.Name, desiredName, StringComparison.Ordinal))
+        {
+            return playlist;
+        }
+
+        if (playlist.OwnerUserId != Guid.Empty && playlist.OwnerUserId != userId)
+        {
+            _logger.LogDebug("Skipping rename for {Playlist} because it is owned by another user.", playlist.Name);
+            return playlist;
+        }
+
+        try
+        {
+            await _playlistManager.UpdatePlaylist(new PlaylistUpdateRequest
+            {
+                Id = playlist.Id,
+                UserId = userId,
+                Name = desiredName,
+                Ids = GetRawPlaylistItemIds(playlist),
+                Public = playlist.OpenAccess
+            }).ConfigureAwait(false);
+
+            _logger.LogInformation("Renamed playlist {OldName} to {NewName} for user {User}.", playlist.Name, desiredName, userId);
+            return _playlistManager.GetPlaylistForUser(playlist.Id, userId) ?? playlist;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not rename playlist {Playlist} to {NewName}.", playlist.Name, desiredName);
+            return playlist;
         }
     }
 
