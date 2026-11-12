@@ -78,6 +78,65 @@
         return svg;
     }
 
+    function syncListItemStates(status) {
+        var playedMap = {};
+        (status && status.Items ? status.Items : []).forEach(function (item) {
+            var id = String(item.Id || item.id || '').toLowerCase();
+            if (id) {
+                playedMap[id] = !!(item.Played !== undefined ? item.Played : item.played);
+            }
+        });
+
+        var listItems = document.querySelectorAll('#itemDetailPage .listItem[data-id], .detailPageWrapperContainer .listItem[data-id]');
+        for (var i = 0; i < listItems.length; i++) {
+            var row = listItems[i];
+            var itemId = String(row.getAttribute('data-id') || '').toLowerCase();
+            if (!itemId || !(itemId in playedMap)) {
+                continue;
+            }
+
+            var played = playedMap[itemId];
+            var image = row.querySelector('.listItemImage');
+            var indicators = image ? image.querySelector('.indicators.listItemIndicators') : null;
+            var playedIndicator = indicators ? indicators.querySelector('.playedIndicator') : null;
+
+            if (played) {
+                if (image && !indicators) {
+                    indicators = document.createElement('div');
+                    indicators.className = 'indicators listItemIndicators';
+                    image.appendChild(indicators);
+                }
+                if (indicators && !playedIndicator) {
+                    playedIndicator = document.createElement('div');
+                    playedIndicator.className = 'playedIndicator indicator';
+                    playedIndicator.innerHTML = '<span class="material-icons indicatorIcon check" aria-hidden="true"></span>';
+                    indicators.appendChild(playedIndicator);
+                }
+            } else if (playedIndicator) {
+                playedIndicator.remove();
+                if (indicators && !indicators.children.length) {
+                    indicators.remove();
+                }
+            }
+
+            var playState = row.querySelector('[is="emby-playstatebutton"]');
+            if (playState) {
+                playState.setAttribute('data-played', played ? 'true' : 'false');
+                playState.setAttribute('title', played ? 'Watched' : 'Mark played');
+                if (played) {
+                    playState.classList.add('playstatebutton-played');
+                } else {
+                    playState.classList.remove('playstatebutton-played');
+                }
+                var icon = playState.querySelector('.material-icons');
+                if (icon) {
+                    icon.classList.toggle('playstatebutton-icon-played', played);
+                    icon.classList.toggle('playstatebutton-icon-unplayed', !played);
+                }
+            }
+        }
+    }
+
     function render(status) {
         var itemId = getItemIdFromRoute();
         var playlistId = status && status.PlaylistId ? String(status.PlaylistId).toLowerCase() : null;
@@ -96,6 +155,8 @@
         var remaining = Number(status.Remaining) || 0;
         var percent = total > 0 ? Math.round(played / total * 100) : 0;
         var key = percent + '|' + played + '|' + total + '|' + remaining;
+
+        syncListItemStates(status);
 
         var container = document.getElementById(CONTAINER_ID);
         var bar = document.getElementById(BAR_ID);
