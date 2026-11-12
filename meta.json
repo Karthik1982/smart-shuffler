@@ -1,0 +1,13 @@
+{
+  "category": "General",
+  "changelog": "1.0.0.0: Initial release with configurable watch threshold and skip cooldown, per-user private playlists, auto-dedupe, cleanup, playlist-only skipping, auto-reset, and progress display on the plugin page and native playlist details (via JavaScript Injector).",
+  "description": "Only plays unwatched videos from a dedicated playlist, tracks progress with configurable thresholds, and resets the cycle once everything has been played.",
+  "guid": "7a28699c-e118-4666-84a0-e106de3866fa",
+  "name": "Smart Shuffle Playlist",
+  "overview": "A smart shuffle playlist that tracks played items and skips videos that have already been watched.",
+  "owner": "karthik",
+  "targetAbi": "12.4.0.0",
+  "version": "1.0.0.0",
+  "autoUpdate": false,
+  "assemblies": []
+}

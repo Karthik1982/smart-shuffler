@@ -1,0 +1,1096 @@
+<div id="smartShufflePage" data-role="page" class="page type-interior pluginConfigurationPage">
+    <style>
+        #smartShufflePage {
+            --ssp-green: #43a047;
+            --ssp-blue: #1e88e5;
+            --ssp-red: #e53935;
+            --ssp-border: rgba(128, 128, 128, 0.3);
+            --ssp-card: rgba(128, 128, 128, 0.08);
+            --ssp-muted: rgba(128, 128, 128, 0.85);
+            color: inherit;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #smartShufflePage * {
+            box-sizing: border-box;
+        }
+
+        #smartShufflePage .ssp-page {
+            padding: 1.25rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        #smartShufflePage .ssp-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.25rem;
+        }
+
+        #smartShufflePage h1 {
+            margin: 0 0 0.35rem;
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        #smartShufflePage h2 {
+            margin: 0 0 0.85rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        #smartShufflePage .ssp-muted {
+            margin: 0;
+            color: var(--ssp-muted);
+            font-size: 0.9rem;
+            line-height: 1.45;
+            max-width: 720px;
+        }
+
+        #smartShufflePage .ssp-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        #smartShufflePage button {
+            border: 1px solid transparent;
+            border-radius: 6px;
+            padding: 0.5rem 0.9rem;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--ssp-blue);
+            color: #fff;
+            transition: filter 0.15s ease, opacity 0.15s ease;
+        }
+
+        #smartShufflePage button:hover:not(:disabled) {
+            filter: brightness(1.08);
+        }
+
+        #smartShufflePage button:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
+
+        #smartShufflePage button.ssp-secondary {
+            background: transparent;
+            border-color: var(--ssp-border);
+            color: inherit;
+        }
+
+        #smartShufflePage button.ssp-danger {
+            background: var(--ssp-red);
+        }
+
+        #smartShufflePage button.ssp-small {
+            padding: 0.3rem 0.65rem;
+            font-size: 0.8rem;
+        }
+
+        #smartShufflePage .ssp-dashboard {
+            margin-bottom: 1rem;
+        }
+
+        #smartShufflePage .ssp-card {
+            background: var(--ssp-card);
+            border: 1px solid var(--ssp-border);
+            border-radius: 10px;
+            padding: 1rem;
+        }
+
+        #smartShufflePage .ssp-playlist-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.6rem;
+        }
+
+        #smartShufflePage .ssp-playlist-header h2 {
+            margin-bottom: 0.2rem;
+        }
+
+        #smartShufflePage .ssp-mini-progress {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        #smartShufflePage #sspMiniPie {
+            width: 64px;
+            height: 64px;
+            display: block;
+        }
+
+        #smartShufflePage .ssp-mini-progress-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+        #smartShufflePage .ssp-mini-progress-text strong {
+            font-size: 1.15rem;
+        }
+
+        #smartShufflePage .ssp-mini-progress-text span {
+            color: var(--ssp-muted);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        #smartShufflePage .ssp-progress-bar {
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(128, 128, 128, 0.18);
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+        }
+
+        #smartShufflePage .ssp-progress-bar-fill {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, var(--ssp-green), var(--ssp-blue));
+            transition: width 0.3s ease;
+        }
+
+        #smartShufflePage .ssp-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        #smartShufflePage .ssp-stat {
+            background: var(--ssp-card);
+            border: 1px solid var(--ssp-border);
+            border-radius: 10px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.25rem;
+            min-height: 110px;
+        }
+
+        #smartShufflePage .ssp-stat span {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        #smartShufflePage .ssp-stat label {
+            color: var(--ssp-muted);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        #smartShufflePage .ssp-stat small {
+            color: var(--ssp-muted);
+            font-size: 0.78rem;
+            line-height: 1.3;
+        }
+
+        #smartShufflePage .ssp-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        #smartShufflePage .ssp-grid > * {
+            min-width: 0;
+        }
+
+        #smartShufflePage .ssp-search-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        #smartShufflePage input[type="search"] {
+            flex: 1;
+            min-width: 0;
+            padding: 0.5rem 0.7rem;
+            border-radius: 6px;
+            border: 1px solid var(--ssp-border);
+            background: transparent;
+            color: inherit;
+            font-size: 0.9rem;
+        }
+
+        #smartShufflePage input[type="search"]:focus {
+            outline: 2px solid var(--ssp-blue);
+            outline-offset: 1px;
+        }
+
+        #smartShufflePage .ssp-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        #smartShufflePage .ssp-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            min-width: 0;
+            padding: 0.55rem 0.65rem;
+            border: 1px solid var(--ssp-border);
+            border-radius: 8px;
+        }
+
+        #smartShufflePage .ssp-row-main {
+            min-width: 0;
+        }
+
+        #smartShufflePage .ssp-row-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #smartShufflePage .ssp-row-sub {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--ssp-muted);
+            font-size: 0.78rem;
+            margin-top: 0.15rem;
+            flex-wrap: wrap;
+        }
+
+        #smartShufflePage .ssp-badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 0.1rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        #smartShufflePage .ssp-badge-played {
+            background: rgba(67, 160, 71, 0.18);
+            color: var(--ssp-green);
+        }
+
+        #smartShufflePage .ssp-badge-unplayed {
+            background: rgba(30, 136, 229, 0.16);
+            color: var(--ssp-blue);
+        }
+
+        #smartShufflePage .ssp-empty {
+            color: var(--ssp-muted);
+            font-size: 0.85rem;
+            padding: 0.5rem 0.15rem;
+            line-height: 1.45;
+        }
+
+        #smartShufflePage .ssp-message {
+            min-height: 1.4rem;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            color: var(--ssp-muted);
+        }
+
+        #smartShufflePage .ssp-message-error {
+            color: var(--ssp-red);
+        }
+
+        #smartShufflePage .ssp-message-success {
+            color: var(--ssp-green);
+        }
+
+        #smartShufflePage .ssp-settings {
+            display: none;
+            margin-bottom: 1rem;
+        }
+
+        #smartShufflePage .ssp-settings.ssp-visible {
+            display: block;
+        }
+
+        #smartShufflePage .ssp-settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+
+        #smartShufflePage .ssp-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        #smartShufflePage .ssp-field label {
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        #smartShufflePage .ssp-field input[type="number"],
+        #smartShufflePage .ssp-field input[type="text"] {
+            padding: 0.45rem 0.6rem;
+            border-radius: 6px;
+            border: 1px solid var(--ssp-border);
+            background: transparent;
+            color: inherit;
+            font-size: 0.9rem;
+        }
+
+        #smartShufflePage .ssp-field input:focus {
+            outline: 2px solid var(--ssp-blue);
+            outline-offset: 1px;
+        }
+
+        #smartShufflePage .ssp-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+
+        #smartShufflePage .ssp-check input {
+            margin-top: 0.2rem;
+        }
+
+        #smartShufflePage .ssp-settings-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 820px) {
+            #smartShufflePage .ssp-grid,
+            #smartShufflePage .ssp-settings-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #smartShufflePage .ssp-stats {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 520px) {
+            #smartShufflePage .ssp-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <div data-role="content">
+        <div class="ssp-page">
+            <div class="ssp-header">
+                <div>
+                    <h1>Smart Shuffle Playlist</h1>
+                    <p class="ssp-muted">
+                        Only unwatched videos are allowed to play. An item is marked watched after the configured
+                        progress threshold. When every item has been played, the cycle resets automatically on the
+                        next playback.
+                    </p>
+                </div>
+                <div class="ssp-actions">
+                    <button id="sspRefreshBtn" class="ssp-secondary" type="button">Refresh</button>
+                    <button id="sspResetBtn" class="ssp-danger" type="button">Reset progress</button>
+                </div>
+            </div>
+
+            <div class="ssp-dashboard">
+                <div class="ssp-stats">
+                    <div class="ssp-stat">
+                        <span id="sspTotalCount">0</span>
+                        <label>Total videos</label>
+                        <small>Unique items in the playlist</small>
+                    </div>
+                    <div class="ssp-stat">
+                        <span id="sspPlayedCount">0</span>
+                        <label>Played</label>
+                        <small>Reached the threshold or completed</small>
+                    </div>
+                    <div class="ssp-stat">
+                        <span id="sspRemainingCount">0</span>
+                        <label>Remaining</label>
+                        <small>Ready to play</small>
+                    </div>
+                </div>
+            </div>
+
+            <section id="sspSettings" class="ssp-card ssp-settings">
+                <h2>Plugin settings</h2>
+                <p class="ssp-muted">
+                    These settings are available to administrators. Playlist name changes apply only to newly
+                    created playlists. Non-admin users can manage their own private playlist at
+                    <a href="/web/ConfigurationPage?name=SmartShufflePlaylist" target="_blank" rel="noopener">/web/ConfigurationPage?name=SmartShufflePlaylist</a>.
+                </p>
+                <div class="ssp-settings-grid">
+                    <div class="ssp-field">
+                        <label for="sspThreshold">Watch threshold (%)</label>
+                        <input id="sspThreshold" type="number" min="1" max="100" step="1">
+                    </div>
+                    <div class="ssp-field">
+                        <label for="sspCooldown">Skip cooldown (seconds)</label>
+                        <input id="sspCooldown" type="number" min="0" max="300" step="1">
+                    </div>
+                    <div class="ssp-field">
+                        <label for="sspPlaylistName">Playlist name</label>
+                        <input id="sspPlaylistName" type="text" autocomplete="off">
+                    </div>
+                    <label class="ssp-check">
+                        <input id="sspShared" type="checkbox">
+                        <span>Make new playlists shared/public instead of private.</span>
+                    </label>
+                    <label class="ssp-check">
+                        <input id="sspAutoReset" type="checkbox">
+                        <span>Reset progress automatically when every item has been played.</span>
+                    </label>
+                    <label class="ssp-check">
+                        <input id="sspSkipOnly" type="checkbox">
+                        <span>Only skip watched items during playlist playback.</span>
+                    </label>
+                    <label class="ssp-check">
+                        <input id="sspAutoDedupe" type="checkbox">
+                        <span>Automatically remove duplicate playlist entries.</span>
+                    </label>
+                </div>
+                <div class="ssp-settings-actions">
+                    <button id="sspSaveSettingsBtn" type="button">Save settings</button>
+                    <button id="sspCleanupBtn" class="ssp-secondary" type="button">Remove duplicates</button>
+                </div>
+            </section>
+
+            <div class="ssp-grid">
+                <section class="ssp-card">
+                    <div class="ssp-playlist-header">
+                        <div>
+                            <h2>Playlist items</h2>
+                            <p id="sspPlaylistSummary" class="ssp-muted">Loading progress...</p>
+                        </div>
+                        <div class="ssp-mini-progress">
+                            <svg id="sspMiniPie" viewBox="0 0 100 100" role="img" aria-label="Playlist progress"></svg>
+                            <div class="ssp-mini-progress-text">
+                                <strong id="sspMiniPercent">0%</strong>
+                                <span>complete</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ssp-progress-bar" aria-hidden="true">
+                        <div id="sspProgressBarFill" class="ssp-progress-bar-fill"></div>
+                    </div>
+                    <div id="sspItemsList" class="ssp-list">
+                        <div class="ssp-empty">Loading playlist...</div>
+                    </div>
+                </section>
+
+                <section class="ssp-card">
+                    <h2>Add videos</h2>
+                    <div class="ssp-search-row">
+                        <input id="sspSearchInput" type="search" placeholder="Search movies, episodes, videos..." autocomplete="off">
+                        <button id="sspSearchBtn" type="button">Search</button>
+                    </div>
+                    <div id="sspSearchResults" class="ssp-list">
+                        <div class="ssp-empty">Type a search term to find videos to add.</div>
+                    </div>
+                </section>
+            </div>
+
+            <div id="sspMessage" class="ssp-message"></div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            var root = document.getElementById("smartShufflePage");
+            if (!root || root.dataset.sspInitialized === "1") {
+                return;
+            }
+
+            root.dataset.sspInitialized = "1";
+
+            function el(id) {
+                return root.querySelector("#" + id);
+            }
+
+            var pluginId = "7a28699c-e118-4666-84a0-e106de3866fa";
+            var currentStatus = { total: 0, played: 0, remaining: 0, items: [] };
+            var searchItems = [];
+            var searchTimer = null;
+            var busy = false;
+            var isAdmin = false;
+
+            function getApiClient() {
+                try {
+                    if (window.ApiClient) {
+                        return window.ApiClient;
+                    }
+                } catch (e) { /* ignore */ }
+
+                try {
+                    if (window.parent && window.parent.ApiClient) {
+                        return window.parent.ApiClient;
+                    }
+                } catch (e) { /* ignore */ }
+
+                try {
+                    if (window.top && window.top.ApiClient) {
+                        return window.top.ApiClient;
+                    }
+                } catch (e) { /* ignore */ }
+
+                return null;
+            }
+
+            function getToken() {
+                var client = getApiClient();
+                if (client && typeof client.accessToken === "function") {
+                    try {
+                        return client.accessToken();
+                    } catch (e) { /* ignore */ }
+                }
+
+                try {
+                    var credentials = JSON.parse(localStorage.getItem("jellyfin_credentials") || "{}");
+                    var servers = credentials.Servers || [];
+                    if (servers.length && servers[0].AccessToken) {
+                        return servers[0].AccessToken;
+                    }
+                } catch (e) { /* ignore */ }
+
+                return "";
+            }
+
+            function apiUrl(path, params) {
+                var client = getApiClient();
+                if (client && typeof client.getUrl === "function") {
+                    try {
+                        return client.getUrl(path, params);
+                    } catch (e) { /* ignore */ }
+                }
+
+                var url = "/" + String(path).replace(/^\/+/, "");
+                if (params) {
+                    var search = new URLSearchParams();
+                    Object.keys(params).forEach(function (key) {
+                        if (params[key] !== undefined && params[key] !== null && params[key] !== "") {
+                            search.append(key, params[key]);
+                        }
+                    });
+                    var query = search.toString();
+                    if (query) {
+                        url += "?" + query;
+                    }
+                }
+
+                return url;
+            }
+
+            async function apiRequest(method, path, body, params) {
+                var headers = { "Accept": "application/json" };
+                var token = getToken();
+                if (token) {
+                    headers["Authorization"] = 'MediaBrowser Token="' + token + '"';
+                    headers["X-Emby-Token"] = token;
+                }
+
+                var request = {
+                    method: method,
+                    headers: headers,
+                    credentials: "include"
+                };
+
+                if (body !== undefined && body !== null) {
+                    headers["Content-Type"] = "application/json";
+                    request.body = JSON.stringify(body);
+                }
+
+                var response = await fetch(apiUrl(path, params), request);
+                if (!response.ok) {
+                    var text = await response.text();
+                    throw new Error(text || ("Request failed with status " + response.status));
+                }
+
+                if (response.status === 204) {
+                    return null;
+                }
+
+                return await response.json();
+            }
+
+            function pick(data, pascal, camel, fallback) {
+                if (data && data[pascal] !== undefined) {
+                    return data[pascal];
+                }
+
+                if (data && data[camel] !== undefined) {
+                    return data[camel];
+                }
+
+                return fallback;
+            }
+
+            function clampNumber(value, min, max, fallback) {
+                if (typeof value !== "number" || !isFinite(value)) {
+                    return fallback;
+                }
+
+                return Math.min(max, Math.max(min, value));
+            }
+
+            function normalizeConfig(data) {
+                data = data || {};
+                return {
+                    watchThresholdPercent: Number(pick(data, "WatchThresholdPercent", "watchThresholdPercent", 95)),
+                    skipCooldownSeconds: Number(pick(data, "SkipCooldownSeconds", "skipCooldownSeconds", 3)),
+                    playlistName: String(pick(data, "PlaylistName", "playlistName", "SmartShufflePlaylist")),
+                    sharedPlaylist: !!pick(data, "SharedPlaylist", "sharedPlaylist", false),
+                    autoResetOnComplete: !!pick(data, "AutoResetOnComplete", "autoResetOnComplete", true),
+                    skipOnlyDuringPlaylistPlayback: !!pick(data, "SkipOnlyDuringPlaylistPlayback", "skipOnlyDuringPlaylistPlayback", true),
+                    autoDedupe: !!pick(data, "AutoDedupe", "autoDedupe", true)
+                };
+            }
+
+            function normalizeStatus(data) {
+                data = data || {};
+                var items = data.Items || data.items || [];
+                return {
+                    total: Number(data.Total !== undefined ? data.Total : (data.total || 0)),
+                    played: Number(data.Played !== undefined ? data.Played : (data.played || 0)),
+                    remaining: Number(data.Remaining !== undefined ? data.Remaining : (data.remaining || 0)),
+                    items: items.map(function (item) {
+                        return {
+                            Id: item.Id || item.id,
+                            Name: item.Name || item.name,
+                            Type: item.Type || item.type,
+                            RunTimeTicks: item.RunTimeTicks !== undefined ? item.RunTimeTicks : (item.runTimeTicks || 0),
+                            Played: !!(item.Played !== undefined ? item.Played : item.played)
+                        };
+                    })
+                };
+            }
+
+            function setMessage(text, kind) {
+                var element = el("sspMessage");
+                element.textContent = text || "";
+                element.className = "ssp-message" + (kind ? " ssp-message-" + kind : "");
+            }
+
+            function setBusy(value) {
+                busy = value;
+                var buttons = root.querySelectorAll("button");
+                for (var i = 0; i < buttons.length; i++) {
+                    buttons[i].disabled = value;
+                }
+            }
+
+            function formatRuntime(ticks) {
+                if (!ticks || ticks <= 0) {
+                    return "";
+                }
+
+                var totalMinutes = Math.round(ticks / 600000000);
+                var hours = Math.floor(totalMinutes / 60);
+                var minutes = totalMinutes % 60;
+                if (hours > 0) {
+                    return hours + "h " + minutes + "m";
+                }
+
+                return minutes + "m";
+            }
+
+            function renderMiniPie(played, total) {
+                var svg = el("sspMiniPie");
+                var radius = 40;
+                var circumference = 2 * Math.PI * radius;
+                var ratio = total > 0 ? Math.min(1, Math.max(0, played / total)) : 0;
+                var playedLength = circumference * ratio;
+                var green = "#43a047";
+                var blue = "#1e88e5";
+                var gray = "rgba(128,128,128,0.25)";
+                var baseColor = total > 0 ? blue : gray;
+
+                if (total > 0 && played >= total) {
+                    baseColor = green;
+                }
+
+                var markup = '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + baseColor + '" stroke-width="12"></circle>';
+
+                if (played > 0 && played < total) {
+                    markup += '<circle cx="50" cy="50" r="' + radius + '" fill="none" stroke="' + green + '" stroke-width="12" stroke-dasharray="' + playedLength + ' ' + circumference + '" stroke-linecap="round" transform="rotate(-90 50 50)"></circle>';
+                }
+
+                svg.innerHTML = markup;
+            }
+
+            function renderStats(status) {
+                el("sspTotalCount").textContent = status.total;
+                el("sspPlayedCount").textContent = status.played;
+                el("sspRemainingCount").textContent = status.remaining;
+
+                var percent = status.total > 0
+                    ? Math.min(100, Math.max(0, Math.round(status.played / status.total * 100)))
+                    : 0;
+
+                el("sspMiniPercent").textContent = percent + "%";
+                el("sspPlaylistSummary").textContent =
+                    status.played + " of " + status.total + " played · " + status.remaining + " remaining";
+                el("sspProgressBarFill").style.width = percent + "%";
+                renderMiniPie(status.played, status.total);
+            }
+
+            function itemKey(item) {
+                return String(item.Id || "").replace(/-/g, "").toLowerCase();
+            }
+
+            function renderItems(items) {
+                var container = el("sspItemsList");
+                if (!items || items.length === 0) {
+                    container.innerHTML = '<div class="ssp-empty">No videos yet. Use the search on the right to add some.</div>';
+                    return;
+                }
+
+                var html = "";
+                items.forEach(function (item) {
+                    var runtime = formatRuntime(item.RunTimeTicks);
+                    var badge = item.Played
+                        ? '<span class="ssp-badge ssp-badge-played">Played</span>'
+                        : '<span class="ssp-badge ssp-badge-unplayed">Unplayed</span>';
+
+                    html += '<div class="ssp-row">' +
+                        '<div class="ssp-row-main">' +
+                            '<div class="ssp-row-title">' + escapeHtml(item.Name || "(untitled)") + '</div>' +
+                            '<div class="ssp-row-sub">' + badge +
+                                (runtime ? '<span>' + escapeHtml(runtime) + '</span>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        '<button type="button" class="ssp-danger ssp-small" data-ssp-remove="' + escapeHtml(item.Id) + '">Remove</button>' +
+                    '</div>';
+                });
+
+                container.innerHTML = html;
+                var buttons = container.querySelectorAll("[data-ssp-remove]");
+                for (var i = 0; i < buttons.length; i++) {
+                    buttons[i].addEventListener("click", function () {
+                        removeItem(this.getAttribute("data-ssp-remove"));
+                    });
+                }
+            }
+
+            function renderSearchResults() {
+                var container = el("sspSearchResults");
+                if (!searchItems || searchItems.length === 0) {
+                    container.innerHTML = '<div class="ssp-empty">No matching videos found.</div>';
+                    return;
+                }
+
+                var playlistKeys = {};
+                (currentStatus.items || []).forEach(function (item) {
+                    playlistKeys[itemKey(item)] = true;
+                });
+
+                var html = "";
+                searchItems.forEach(function (item) {
+                    var key = itemKey(item);
+                    var runtime = formatRuntime(item.RunTimeTicks);
+                    var alreadyAdded = !!playlistKeys[key];
+                    var button = alreadyAdded
+                        ? '<button type="button" class="ssp-secondary ssp-small" disabled>Added</button>'
+                        : '<button type="button" class="ssp-small" data-ssp-add="' + escapeHtml(item.Id) + '">Add</button>';
+
+                    html += '<div class="ssp-row">' +
+                        '<div class="ssp-row-main">' +
+                            '<div class="ssp-row-title">' + escapeHtml(item.Name || "(untitled)") + '</div>' +
+                            '<div class="ssp-row-sub">' +
+                                '<span>' + escapeHtml(item.Type || "Video") + '</span>' +
+                                (runtime ? '<span>' + escapeHtml(runtime) + '</span>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        button +
+                    '</div>';
+                });
+
+                container.innerHTML = html;
+                var buttons = container.querySelectorAll("[data-ssp-add]");
+                for (var i = 0; i < buttons.length; i++) {
+                    buttons[i].addEventListener("click", function () {
+                        addItem(this.getAttribute("data-ssp-add"));
+                    });
+                }
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#39;");
+            }
+
+            async function refresh() {
+                setBusy(true);
+                try {
+                    currentStatus = normalizeStatus(await apiRequest("GET", "SmartShufflePlaylist/Status"));
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage("", "");
+                } catch (error) {
+                    setMessage("Could not load the playlist: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function addItem(itemId) {
+                if (!itemId || busy) {
+                    return;
+                }
+
+                setBusy(true);
+                try {
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: [itemId] }));
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage("Video added to the playlist.", "success");
+                } catch (error) {
+                    setMessage("Could not add the video: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function removeItem(itemId) {
+                if (!itemId || busy) {
+                    return;
+                }
+
+                setBusy(true);
+                try {
+                    currentStatus = normalizeStatus(await apiRequest("DELETE", "SmartShufflePlaylist/Items/" + itemId));
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage("Video removed from the playlist.", "success");
+                } catch (error) {
+                    setMessage("Could not remove the video: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function resetProgress() {
+                if (busy) {
+                    return;
+                }
+
+                if (!window.confirm("Reset the played progress for this playlist?")) {
+                    return;
+                }
+
+                setBusy(true);
+                try {
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Reset", {}));
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage("Playback progress reset.", "success");
+                } catch (error) {
+                    setMessage("Could not reset progress: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function loadCurrentUser() {
+                try {
+                    var me = await apiRequest("GET", "Users/Me");
+                    var policy = me && (me.Policy || me.policy) ? (me.Policy || me.policy) : {};
+                    isAdmin = !!(policy.IsAdministrator !== undefined
+                        ? policy.IsAdministrator
+                        : policy.isAdministrator);
+                } catch (error) {
+                    isAdmin = false;
+                }
+            }
+
+            function populateSettings(config) {
+                el("sspThreshold").value = config.watchThresholdPercent;
+                el("sspCooldown").value = config.skipCooldownSeconds;
+                el("sspPlaylistName").value = config.playlistName;
+                el("sspShared").checked = config.sharedPlaylist;
+                el("sspAutoReset").checked = config.autoResetOnComplete;
+                el("sspSkipOnly").checked = config.skipOnlyDuringPlaylistPlayback;
+                el("sspAutoDedupe").checked = config.autoDedupe;
+            }
+
+            async function loadConfiguration() {
+                if (!isAdmin) {
+                    return;
+                }
+
+                try {
+                    var config = normalizeConfig(await apiRequest("GET", "Plugins/" + pluginId + "/Configuration"));
+                    populateSettings(config);
+                    el("sspSettings").classList.add("ssp-visible");
+                } catch (error) {
+                    setMessage("Could not load plugin settings: " + error.message, "error");
+                }
+            }
+
+            function readSettings() {
+                var threshold = Number(el("sspThreshold").value);
+                var cooldown = Number(el("sspCooldown").value);
+                var name = el("sspPlaylistName").value.trim();
+                return {
+                    WatchThresholdPercent: clampNumber(threshold, 1, 100, 95),
+                    SkipCooldownSeconds: clampNumber(cooldown, 0, 300, 3),
+                    PlaylistName: name || "SmartShufflePlaylist",
+                    SharedPlaylist: el("sspShared").checked,
+                    AutoResetOnComplete: el("sspAutoReset").checked,
+                    SkipOnlyDuringPlaylistPlayback: el("sspSkipOnly").checked,
+                    AutoDedupe: el("sspAutoDedupe").checked
+                };
+            }
+
+            async function saveSettings() {
+                if (busy || !isAdmin) {
+                    return;
+                }
+
+                setBusy(true);
+                try {
+                    var config = readSettings();
+                    await apiRequest("POST", "Plugins/" + pluginId + "/Configuration", config);
+                    populateSettings(normalizeConfig(config));
+                    setMessage("Settings saved. Playlist name changes apply to new playlists only.", "success");
+                } catch (error) {
+                    setMessage("Could not save settings: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function cleanupDuplicates() {
+                if (busy || !isAdmin) {
+                    return;
+                }
+
+                if (!window.confirm("Remove duplicate entries from the playlist?")) {
+                    return;
+                }
+
+                setBusy(true);
+                try {
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Cleanup", {}));
+                    renderStats(currentStatus);
+                    renderItems(currentStatus.items);
+                    renderSearchResults();
+                    setMessage("Duplicate playlist entries removed.", "success");
+                } catch (error) {
+                    setMessage("Could not clean up the playlist: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function search(term) {
+                var query = (term || "").trim();
+                if (!query) {
+                    searchItems = [];
+                    el("sspSearchResults").innerHTML =
+                        '<div class="ssp-empty">Type a search term to find videos to add.</div>';
+                    return;
+                }
+
+                var client = getApiClient();
+                var userId = "";
+                if (client && typeof client.getCurrentUserId === "function") {
+                    try {
+                        userId = client.getCurrentUserId();
+                    } catch (e) { /* ignore */ }
+                }
+
+                var params = {
+                    searchTerm: query,
+                    recursive: "true",
+                    includeItemTypes: "Movie,Episode,Video,MusicVideo",
+                    limit: "30",
+                    fields: "RunTimeTicks",
+                    sortBy: "SortName",
+                    sortOrder: "Ascending"
+                };
+
+                if (userId) {
+                    params.userId = userId;
+                }
+
+                setBusy(true);
+                try {
+                    var result = await apiRequest("GET", "Items", undefined, params);
+
+                    searchItems = result && result.Items ? result.Items : [];
+                    renderSearchResults();
+                    setMessage("", "");
+                } catch (error) {
+                    searchItems = [];
+                    renderSearchResults();
+                    setMessage("Search failed: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            el("sspRefreshBtn").addEventListener("click", refresh);
+            el("sspResetBtn").addEventListener("click", resetProgress);
+            el("sspSaveSettingsBtn").addEventListener("click", saveSettings);
+            el("sspCleanupBtn").addEventListener("click", cleanupDuplicates);
+            el("sspSearchBtn").addEventListener("click", function () {
+                search(el("sspSearchInput").value);
+            });
+
+            el("sspSearchInput").addEventListener("input", function () {
+                var value = this.value;
+                if (searchTimer) {
+                    clearTimeout(searchTimer);
+                }
+
+                searchTimer = setTimeout(function () {
+                    search(value);
+                }, 400);
+            });
+
+            el("sspSearchInput").addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    if (searchTimer) {
+                        clearTimeout(searchTimer);
+                    }
+
+                    search(this.value);
+                }
+            });
+
+            loadCurrentUser().then(function () {
+                if (isAdmin) {
+                    loadConfiguration();
+                }
+            });
+
+            refresh();
+        })();
+    </script>
+</div>
