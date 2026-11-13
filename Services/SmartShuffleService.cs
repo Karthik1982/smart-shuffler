@@ -28,6 +28,7 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
     private readonly IPlaylistManager _playlistManager;
     private readonly ISessionManager _sessionManager;
     private readonly IUserManager _userManager;
+    private readonly ILibraryManager _libraryManager;
     private readonly ILogger<SmartShuffleService> _logger;
     private readonly string _stateFilePath;
     private readonly SemaphoreSlim _stateLock = new(1, 1);
@@ -40,12 +41,14 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
         IPlaylistManager playlistManager,
         ISessionManager sessionManager,
         IUserManager userManager,
+        ILibraryManager libraryManager,
         IApplicationPaths applicationPaths,
         ILogger<SmartShuffleService> logger)
     {
         _playlistManager = playlistManager;
         _sessionManager = sessionManager;
         _userManager = userManager;
+        _libraryManager = libraryManager;
         _logger = logger;
         _stateFilePath = Path.Combine(applicationPaths.PluginConfigurationsPath, "SmartShufflePlaylist.state.json");
     }
@@ -249,12 +252,12 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
                 {
                     try
                     {
-                        await _playlistManager.RemovePlaylistsAsync(guid).ConfigureAwait(false);
+                        _libraryManager.DeleteItem(playlist, new DeleteOptions { DeleteFileLocation = true }, true);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Could not delete Jellyfin playlist {PlaylistId} for user {User}.", guid, userId);
-                        throw new InvalidOperationException("Could not delete the playlist.");
+                        throw new InvalidOperationException("Could not delete the playlist: " + ex.Message);
                     }
                 }
             }
