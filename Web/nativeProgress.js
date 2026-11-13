@@ -122,7 +122,7 @@
             var playState = row.querySelector('[is="emby-playstatebutton"]');
             if (playState) {
                 playState.setAttribute('data-played', played ? 'true' : 'false');
-                playState.setAttribute('title', played ? 'Watched' : 'Mark played');
+                playState.setAttribute('title', played ? 'Played in Smart Shuffle' : 'Not played in Smart Shuffle');
                 if (played) {
                     playState.classList.add('playstatebutton-played');
                 } else {
@@ -133,6 +133,20 @@
                     icon.classList.toggle('playstatebutton-icon-played', played);
                     icon.classList.toggle('playstatebutton-icon-unplayed', !played);
                 }
+            }
+
+            var body = row.querySelector('.listItemBody');
+            var badge = body ? body.querySelector('.ssp-playlist-played-badge') : null;
+            if (played) {
+                if (body && !badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'ssp-playlist-played-badge';
+                    badge.title = 'Played in this Smart Shuffle playlist';
+                    badge.innerHTML = '<span class="material-icons" aria-hidden="true">done_all</span><span>Played here</span>';
+                    body.appendChild(badge);
+                }
+            } else if (badge) {
+                badge.remove();
             }
         }
     }
@@ -259,7 +273,9 @@
             '.ssp-native-text strong{font-size:1.12em;font-weight:600;}',
             '.ssp-native-text span{font-size:.88em;opacity:.72;}',
             '.ssp-native-bar{height:4px;max-width:460px;margin:0 0 .95em;border-radius:2px;background:currentColor;background:color-mix(in srgb,currentColor 18%,transparent);overflow:hidden;}',
-            '.ssp-native-bar-fill{height:100%;background:var(--accent,#00a4dc);border-radius:2px;transition:width .35s ease;}'
+            '.ssp-native-bar-fill{height:100%;background:var(--accent,#00a4dc);border-radius:2px;transition:width .35s ease;}',
+            '.ssp-playlist-played-badge{display:inline-flex;align-items:center;gap:.25em;margin-top:.2em;padding:.1em .45em;border-radius:999px;background:rgba(76,175,80,.18);color:#8bd48f;font-size:.78em;font-weight:600;width:fit-content;}',
+            '.ssp-playlist-played-badge .material-icons{font-size:1em;line-height:1;}'
         ].join('');
         document.head.appendChild(style);
     }
