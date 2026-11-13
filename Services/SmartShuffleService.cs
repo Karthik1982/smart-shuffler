@@ -178,6 +178,13 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
     {
         EnsureUser(userId);
         var trimmed = string.IsNullOrWhiteSpace(name) ? DefaultPlaylistName() : name.Trim();
+
+        var existingOverview = await GetPlaylistsAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (existingOverview.Playlists.Any(p => string.Equals(p.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"A playlist named '{trimmed}' already exists.");
+        }
+
         await _ensureLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -199,6 +206,11 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
             {
                 var userState = GetOrCreateUserState(state, userId);
                 EnsureMigrated(userState);
+                // re-check uniqueness inside lock
+                if (userState.Playlists.Any(p => string.Equals(p.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new InvalidOperationException($"A playlist named '{trimmed}' already exists.");
+                }
                 if (!userState.Playlists.Any(p => string.Equals(p.PlaylistId, ToKey(playlistId), StringComparison.OrdinalIgnoreCase)))
                 {
                     userState.Playlists.Add(new ManagedPlaylistState
@@ -220,6 +232,56 @@ public sealed class SmartShuffleService : IHostedService, IDisposable
         }
 
         return await GetPlaylistsAsync(userId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<PlaylistsOverview> DeleteManagedPlaylistAsync(Guid userId, Guid playlistId, CancellationToken cancellationToken = default)
+    {
+        EnsureUser(userId);
+        var key = ToKey(playlistId);
+
+        await _ensureLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (Guid.TryParse(key, out var guid))
+            {
+                var playlist = _playlistManager.GetPlaylistForUser(guid, userId);
+                if (playlist != null)
+                {
+                    try
+                    {
+                        await _playlistManager.RemovePlaylistsAsync(guid).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Could not delete Jellyfin playlist {PlaylistId} for user {User}.", guid, userId);
+                        throw new InvalidOperationException("Could not delete the playlist.");
+                    }
+                }
+            }
+
+            await UpdateStateAsync(state =>
+            {
+                var userState = GetOrCreateUserState(state, userId);
+                EnsureMigrated(userState);
+                var removed = userState.Playlists.RemoveAll(p => string.Equals(p.PlaylistId, key, StringComparison.OrdinalIgnoreCase)) > 0;
+                if (string.Equals(userState.ActivePlaylistId, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    userState.ActivePlaylistId = userState.Playlists.FirstOrDefault()?.PlaylistId;
+                }
+                return removed || userState.ActivePlaylistId == null;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _ensureLock.Release();
+        }
+
+        var overview = await GetPlaylistsAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (overview.Playlists.Count == 0)
+        {
+            overview = await CreateManagedPlaylistAsync(userId, DefaultPlaylistName(), cancellationToken).ConfigureAwait(false);
+        }
+        return overview;
     }
 
     public async Task<PlaylistsOverview> SetActivePlaylistAsync(Guid userId, Guid playlistId, CancellationToken cancellationToken = default)

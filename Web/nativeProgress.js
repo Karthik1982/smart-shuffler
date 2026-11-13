@@ -157,33 +157,70 @@
         }
     }
 
-    function hideGlobalPlaylistStats() {
-        var infoSelectors = [
-            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-primary .mediaInfoItem',
-            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-secondary .mediaInfoItem',
-            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-primary',
-            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-secondary'
-        ];
+    function hideGlobalPlaylistStats(status) {
+        var played = Number(status && status.Played) || 0;
+        var total = Number(status && status.Total) || 0;
+        var remaining = Number(status && status.Remaining) || 0;
+        var percent = total > 0 ? Math.round(played / total * 100) : 0;
 
-        infoSelectors.forEach(function (selector) {
-            var nodes = document.querySelectorAll(selector);
-            for (var i = 0; i < nodes.length; i++) {
-                var node = nodes[i];
-                var text = (node.textContent || '').toLowerCase();
-                if (text.indexOf('watched') !== -1 || text.indexOf('unwatched') !== -1 || text.indexOf('unplayed') !== -1) {
-                    node.style.display = 'none';
-                    node.dataset.sspHiddenGlobal = '1';
-                }
+        var infoItems = document.querySelectorAll(
+            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-primary .mediaInfoItem, ' +
+            '.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-secondary .mediaInfoItem'
+        );
+        for (var i = 0; i < infoItems.length; i++) {
+            var node = infoItems[i];
+            var text = (node.textContent || '').toLowerCase().trim();
+            if (text.indexOf('watched') !== -1 || text.indexOf('unwatched') !== -1 || text.indexOf('unplayed') !== -1) {
+                node.style.display = 'none';
+                node.dataset.sspHiddenGlobal = '1';
+                continue;
             }
-        });
+            // hide global percent like "81%" or "81% played"
+            if (/^\d{1,3}%(\s|$)/.test(text) || text.indexOf('% played') !== -1 || text.indexOf('% complete') !== -1) {
+                node.style.display = 'none';
+                node.dataset.sspHiddenGlobal = '1';
+            }
+        }
+
+        // Replace or add our own watched/unwatched summary in misc info
+        var miscPrimary = document.querySelector('.detailPagePrimaryContainer .infoWrapper .itemMiscInfo-primary');
+        if (miscPrimary) {
+            var sspWatched = miscPrimary.querySelector('.ssp-native-watched-info');
+            if (!sspWatched) {
+                sspWatched = document.createElement('div');
+                sspWatched.className = 'mediaInfoItem ssp-native-watched-info';
+                miscPrimary.appendChild(sspWatched);
+            }
+            sspWatched.textContent = played + ' watched (playlist)';
+            var sspUnwatched = miscPrimary.querySelector('.ssp-native-unwatched-info');
+            if (!sspUnwatched) {
+                sspUnwatched = document.createElement('div');
+                sspUnwatched.className = 'mediaInfoItem ssp-native-unwatched-info';
+                miscPrimary.appendChild(sspUnwatched);
+            }
+            sspUnwatched.textContent = remaining + ' unwatched (playlist)';
+        }
+
+        // hide global progress bars on detail image / header
+        var globalBars = document.querySelectorAll(
+            '.detailPagePrimaryContainer .detailImageContainer .itemProgressBar, ' +
+            '.detailPagePrimaryContainer .detailImageContainer .itemProgressBarForeground, ' +
+            '.detailPagePrimaryContainer .detailRibbon .itemProgressBar, ' +
+            '.detailPagePrimaryContainer .itemProgressBar:not(#ssp-native-progress-bar):not(.ssp-native-bar)'
+        );
+        for (var j = 0; j < globalBars.length; j++) {
+            globalBars[j].style.display = 'none';
+            globalBars[j].dataset.sspHiddenGlobal = '1';
+        }
 
         var coverIndicators = document.querySelectorAll(
             '.detailPagePrimaryContainer .detailImageContainer .playedIndicator, ' +
-            '.detailPagePrimaryContainer .detailImageContainer .countIndicator'
+            '.detailPagePrimaryContainer .detailImageContainer .countIndicator, ' +
+            '.detailPagePrimaryContainer .detailImageContainer .indicator'
         );
-        for (var j = 0; j < coverIndicators.length; j++) {
-            coverIndicators[j].style.display = 'none';
-            coverIndicators[j].dataset.sspHiddenGlobal = '1';
+        for (var k = 0; k < coverIndicators.length; k++) {
+            coverIndicators[k].style.display = 'none';
+            coverIndicators[k].dataset.sspHiddenGlobal = '1';
         }
     }
 
@@ -207,7 +244,7 @@
         var key = percent + '|' + played + '|' + total + '|' + remaining;
 
         syncListItemStates(status);
-        hideGlobalPlaylistStats();
+        hideGlobalPlaylistStats(status);
 
         var container = document.getElementById(CONTAINER_ID);
         var bar = document.getElementById(BAR_ID);

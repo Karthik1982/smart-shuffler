@@ -413,6 +413,7 @@
                     <div class="ssp-search-row" style="flex-wrap:wrap;align-items:center;">
                         <select id="sspPlaylistSelect" style="flex:1;min-width:220px;padding:.5rem .7rem;border-radius:6px;border:1px solid var(--ssp-border);background:rgba(128,128,128,.08);color:inherit;"></select>
                         <button id="sspSetActiveBtn" type="button" class="ssp-secondary">Set active</button>
+                        <button id="sspDeletePlaylistBtn" type="button" class="ssp-danger">Delete</button>
                     </div>
                     <div class="ssp-search-row" style="flex-wrap:wrap;">
                         <input id="sspNewPlaylistName" type="text" autocomplete="off" placeholder="New playlist name" style="flex:1;min-width:220px;padding:.5rem .7rem;border-radius:6px;border:1px solid var(--ssp-border);background:rgba(128,128,128,.08);color:inherit;">
@@ -544,7 +545,9 @@
             }
 
             var pluginId = "7a28699c-e118-4666-84a0-e106de3866fa";
-            var currentStatus = { total: 0, played: 0, remaining: 0, items: [] };
+            var currentStatus = { total: 0, played: 0, remaining: 0, items: [], playlistId: "", playlistName: "" };
+            var managedPlaylists = { activePlaylistId: null, playlists: [] };
+            var selectedPlaylistId = "";
             var searchItems = [];
             var selectedKeys = {};
             var searchTimer = null;
@@ -691,6 +694,8 @@
                 data = data || {};
                 var items = data.Items || data.items || [];
                 return {
+                    playlistId: String(pick(data, "PlaylistId", "playlistId", "")),
+                    playlistName: String(pick(data, "PlaylistName", "playlistName", "")),
                     total: Number(data.Total !== undefined ? data.Total : (data.total || 0)),
                     played: Number(data.Played !== undefined ? data.Played : (data.played || 0)),
                     remaining: Number(data.Remaining !== undefined ? data.Remaining : (data.remaining || 0)),
@@ -704,6 +709,28 @@
                         };
                     })
                 };
+            }
+
+            function normalizePlaylists(data) {
+                data = data || {};
+                var lists = data.Playlists || data.playlists || [];
+                return {
+                    activePlaylistId: pick(data, "ActivePlaylistId", "activePlaylistId", null),
+                    playlists: lists.map(function (p) {
+                        return {
+                            playlistId: String(p.PlaylistId || p.playlistId || ""),
+                            name: String(p.Name || p.name || ""),
+                            total: Number(p.Total !== undefined ? p.Total : (p.total || 0)),
+                            played: Number(p.Played !== undefined ? p.Played : (p.played || 0)),
+                            remaining: Number(p.Remaining !== undefined ? p.Remaining : (p.remaining || 0)),
+                            isActive: !!(p.IsActive !== undefined ? p.IsActive : p.isActive)
+                        };
+                    })
+                };
+            }
+
+            function selectedPlaylistParam() {
+                return selectedPlaylistId ? { playlistId: selectedPlaylistId } : undefined;
             }
 
             function setMessage(text, kind) {
@@ -1030,6 +1057,22 @@
                     setMessage("Active playlist updated.", "success");
                 } catch (error) {
                     setMessage("Could not set active playlist: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function deletePlaylist() {
+                if (!selectedPlaylistId || busy) return;
+                if (!window.confirm("Delete this playlist? This will remove it and its progress.")) return;
+                setBusy(true);
+                try {
+                    managedPlaylists = normalizePlaylists(await apiRequest("DELETE", "SmartShufflePlaylist/Playlists/" + selectedPlaylistId));
+                    selectedPlaylistId = managedPlaylists.activePlaylistId || (managedPlaylists.playlists[0] && managedPlaylists.playlists[0].playlistId) || "";
+                    await refresh();
+                    setMessage("Playlist deleted.", "success");
+                } catch (error) {
+                    setMessage("Could not delete playlist: " + error.message, "error");
                 } finally {
                     setBusy(false);
                 }
@@ -1380,6 +1423,7 @@
             el("sspCleanupBtn").addEventListener("click", cleanupDuplicates);
             el("sspCreatePlaylistBtn").addEventListener("click", createPlaylist);
             el("sspSetActiveBtn").addEventListener("click", setActivePlaylist);
+            el("sspDeletePlaylistBtn").addEventListener("click", deletePlaylist);
             el("sspPlaylistSelect").addEventListener("change", function () {
                 selectedPlaylistId = this.value || "";
                 refresh();

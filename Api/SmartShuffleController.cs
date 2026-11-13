@@ -49,7 +49,14 @@ public sealed class SmartShuffleController : ControllerBase
             return BadRequest("Playlist name is required.");
         }
 
-        return Ok(await _service.CreateManagedPlaylistAsync(userId, request.Name, cancellationToken).ConfigureAwait(false));
+        try
+        {
+            return Ok(await _service.CreateManagedPlaylistAsync(userId, request.Name, cancellationToken).ConfigureAwait(false));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("ActivePlaylist")]
@@ -68,7 +75,33 @@ public sealed class SmartShuffleController : ControllerBase
             return BadRequest("Playlist id is required.");
         }
 
-        return Ok(await _service.SetActivePlaylistAsync(userId, request.PlaylistId.Value, cancellationToken).ConfigureAwait(false));
+        try
+        {
+            return Ok(await _service.SetActivePlaylistAsync(userId, request.PlaylistId.Value, cancellationToken).ConfigureAwait(false));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpDelete("Playlists/{playlistId:guid}")]
+    public async Task<ActionResult<PlaylistsOverview>> DeletePlaylist(Guid playlistId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            return Ok(await _service.DeleteManagedPlaylistAsync(userId, playlistId, cancellationToken).ConfigureAwait(false));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("Status")]
