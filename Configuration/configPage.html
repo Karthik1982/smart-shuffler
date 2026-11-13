@@ -408,6 +408,18 @@
             </div>
 
             <div class="ssp-dashboard">
+                <section class="ssp-card" style="margin-bottom:1rem;">
+                    <h2 style="margin-bottom:.5rem;">Manage playlists</h2>
+                    <div class="ssp-search-row" style="flex-wrap:wrap;align-items:center;">
+                        <select id="sspPlaylistSelect" style="flex:1;min-width:220px;padding:.5rem .7rem;border-radius:6px;border:1px solid var(--ssp-border);background:rgba(128,128,128,.08);color:inherit;"></select>
+                        <button id="sspSetActiveBtn" type="button" class="ssp-secondary">Set active</button>
+                    </div>
+                    <div class="ssp-search-row" style="flex-wrap:wrap;">
+                        <input id="sspNewPlaylistName" type="text" autocomplete="off" placeholder="New playlist name" style="flex:1;min-width:220px;padding:.5rem .7rem;border-radius:6px;border:1px solid var(--ssp-border);background:rgba(128,128,128,.08);color:inherit;">
+                        <button id="sspCreatePlaylistBtn" type="button">Create playlist</button>
+                    </div>
+                    <p class="ssp-muted" style="margin:0;">Each smart shuffle playlist tracks progress independently.</p>
+                </section>
                 <div class="ssp-stats">
                     <div class="ssp-stat">
                         <span id="sspTotalCount">0</span>
@@ -430,7 +442,7 @@
             <section id="sspSettings" class="ssp-card ssp-settings">
                 <h2>Plugin settings</h2>
                 <p class="ssp-muted">
-                    These settings are available to administrators. Playlist name changes apply only to newly
+                    These settings are available to administrators. Default name is used when creating the first playlist; each smart shuffle playlist is managed independently. Playlist name changes apply only to newly
                     created playlists. Non-admin users can manage their own private playlist at
                     <a href="/web/ConfigurationPage?name=SmartShufflePlaylist" target="_blank" rel="noopener">/web/ConfigurationPage?name=SmartShufflePlaylist</a>.
                 </p>
@@ -444,8 +456,8 @@
                         <input id="sspCooldown" type="number" min="0" max="300" step="1">
                     </div>
                     <div class="ssp-field">
-                        <label for="sspPlaylistName">Playlist name</label>
-                        <input id="sspPlaylistName" type="text" autocomplete="off">
+                        <label for="sspDefaultPlaylistName">Default name for new playlists</label>
+                        <input id="sspDefaultPlaylistName" type="text" autocomplete="off">
                     </div>
                     <label class="ssp-check">
                         <input id="sspShared" type="checkbox">
@@ -705,7 +717,7 @@
                 var buttons = root.querySelectorAll("button, input, select");
                 for (var i = 0; i < buttons.length; i++) {
                     var element = buttons[i];
-                    if (element.id === "sspPlaylistName" || element.id === "sspThreshold"
+                    if (element.id === "sspDefaultPlaylistName" || element.id === "sspThreshold"
                         || element.id === "sspCooldown" || element.id === "sspShared"
                         || element.id === "sspAutoReset" || element.id === "sspSkipOnly"
                         || element.id === "sspAutoDedupe") {
@@ -720,7 +732,7 @@
                 if (!busy && !isAdmin) {
                     el("sspSaveSettingsBtn").disabled = true;
                     el("sspCleanupBtn").disabled = true;
-                    el("sspPlaylistName").disabled = true;
+                    el("sspDefaultPlaylistName").disabled = true;
                     el("sspThreshold").disabled = true;
                     el("sspCooldown").disabled = true;
                     el("sspShared").disabled = true;
@@ -772,19 +784,36 @@
             }
 
             function renderStats(status) {
-                el("sspTotalCount").textContent = status.total;
-                el("sspPlayedCount").textContent = status.played;
-                el("sspRemainingCount").textContent = status.remaining;
+                var total = status.total || 0;
+                var played = status.played || 0;
+                var remaining = status.remaining || 0;
+                var percent = total > 0 ? Math.round((played / total) * 100) : 0;
 
-                var percent = status.total > 0
-                    ? Math.min(100, Math.max(0, Math.round(status.played / status.total * 100)))
-                    : 0;
-
+                el("sspTotalCount").textContent = String(total);
+                el("sspPlayedCount").textContent = String(played);
+                el("sspRemainingCount").textContent = String(remaining);
                 el("sspMiniPercent").textContent = percent + "%";
-                el("sspPlaylistSummary").textContent =
-                    status.played + " of " + status.total + " played · " + status.remaining + " remaining";
+                var label = status.playlistName ? (status.playlistName + " — ") : "";
+                el("sspPlaylistSummary").textContent = total === 0
+                    ? (label + "Playlist is empty.")
+                    : (label + played + " of " + total + " played · " + remaining + " remaining");
+
+                renderMiniPie(played, total);
                 el("sspProgressBarFill").style.width = percent + "%";
-                renderMiniPie(status.played, status.total);
+            }
+
+            function renderPlaylistSelect() {
+                var select = el("sspPlaylistSelect");
+                var lists = managedPlaylists.playlists || [];
+                if (!lists.length) {
+                    select.innerHTML = '<option value="">No playlists</option>';
+                    return;
+                }
+                select.innerHTML = lists.map(function (p) {
+                    var label = p.name + " (" + p.played + "/" + p.total + ")" + (p.isActive ? " • active" : "");
+                    return '<option value="' + escapeHtml(p.playlistId) + '">' + escapeHtml(label) + '</option>';
+                }).join("");
+                if (selectedPlaylistId) select.value = selectedPlaylistId;
             }
 
             function itemKey(item) {
@@ -958,13 +987,49 @@
             async function refresh() {
                 setBusy(true);
                 try {
-                    currentStatus = normalizeStatus(await apiRequest("GET", "SmartShufflePlaylist/Status"));
+                    managedPlaylists = normalizePlaylists(await apiRequest("GET", "SmartShufflePlaylist/Playlists"));
+                    if (!selectedPlaylistId || !managedPlaylists.playlists.some(function (p) { return p.playlistId === selectedPlaylistId; })) {
+                        selectedPlaylistId = managedPlaylists.activePlaylistId || (managedPlaylists.playlists[0] && managedPlaylists.playlists[0].playlistId) || "";
+                    }
+                    renderPlaylistSelect();
+                    currentStatus = normalizeStatus(await apiRequest("GET", "SmartShufflePlaylist/Status", undefined, selectedPlaylistParam()));
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
                     setMessage("", "");
                 } catch (error) {
                     setMessage("Could not load the playlist: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function createPlaylist() {
+                var name = (el("sspNewPlaylistName").value || "").trim();
+                if (!name || busy) return;
+                setBusy(true);
+                try {
+                    managedPlaylists = normalizePlaylists(await apiRequest("POST", "SmartShufflePlaylist/Playlists", { name: name }));
+                    selectedPlaylistId = managedPlaylists.activePlaylistId || selectedPlaylistId;
+                    el("sspNewPlaylistName").value = "";
+                    await refresh();
+                    setMessage("Playlist created.", "success");
+                } catch (error) {
+                    setMessage("Could not create playlist: " + error.message, "error");
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function setActivePlaylist() {
+                if (!selectedPlaylistId || busy) return;
+                setBusy(true);
+                try {
+                    managedPlaylists = normalizePlaylists(await apiRequest("POST", "SmartShufflePlaylist/ActivePlaylist", { playlistId: selectedPlaylistId }));
+                    await refresh();
+                    setMessage("Active playlist updated.", "success");
+                } catch (error) {
+                    setMessage("Could not set active playlist: " + error.message, "error");
                 } finally {
                     setBusy(false);
                 }
@@ -977,7 +1042,7 @@
 
                 setBusy(true);
                 try {
-                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: [itemId] }));
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: [itemId] }, selectedPlaylistParam()));
                     searchItems = (searchItems || []).filter(function (item) {
                         return itemKey(item) !== String(itemId).toLowerCase();
                     });
@@ -1002,7 +1067,7 @@
                 var ids = items.map(function (item) { return item.Id; });
                 setBusy(true);
                 try {
-                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: ids }));
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: ids }, selectedPlaylistParam()));
                     searchItems = (searchItems || []).filter(function (item) {
                         return ids.indexOf(item.Id) === -1;
                     });
@@ -1032,7 +1097,7 @@
 
                 setBusy(true);
                 try {
-                    currentStatus = normalizeStatus(await apiRequest("DELETE", "SmartShufflePlaylist/Items/" + itemId));
+                    currentStatus = normalizeStatus(await apiRequest("DELETE", "SmartShufflePlaylist/Items/" + itemId, undefined, selectedPlaylistParam()));
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
@@ -1055,7 +1120,7 @@
 
                 setBusy(true);
                 try {
-                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Reset", {}));
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Reset", {}, selectedPlaylistParam()));
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
@@ -1082,7 +1147,7 @@
             function populateSettings(config) {
                 el("sspThreshold").value = config.watchThresholdPercent;
                 el("sspCooldown").value = config.skipCooldownSeconds;
-                el("sspPlaylistName").value = config.playlistName;
+                el("sspDefaultPlaylistName").value = config.playlistName;
                 el("sspShared").checked = config.sharedPlaylist;
                 el("sspAutoReset").checked = config.autoResetOnComplete;
                 el("sspSkipOnly").checked = config.skipOnlyDuringPlaylistPlayback;
@@ -1106,7 +1171,7 @@
             function readSettings() {
                 var threshold = Number(el("sspThreshold").value);
                 var cooldown = Number(el("sspCooldown").value);
-                var name = el("sspPlaylistName").value.trim();
+                var name = el("sspDefaultPlaylistName").value.trim();
                 return {
                     WatchThresholdPercent: clampNumber(threshold, 1, 100, 95),
                     SkipCooldownSeconds: clampNumber(cooldown, 0, 300, 3),
@@ -1128,7 +1193,7 @@
                     var config = readSettings();
                     await apiRequest("POST", "Plugins/" + pluginId + "/Configuration", config);
                     populateSettings(normalizeConfig(config));
-                    setMessage("Settings saved. Playlist name changes apply to new playlists only.", "success");
+                    setMessage("Settings saved.", "success");
                 } catch (error) {
                     setMessage("Could not save settings: " + error.message, "error");
                 } finally {
@@ -1147,7 +1212,7 @@
 
                 setBusy(true);
                 try {
-                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Cleanup", {}));
+                    currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Cleanup", {}, selectedPlaylistParam()));
                     renderStats(currentStatus);
                     renderItems(currentStatus.items);
                     renderSearchResults();
@@ -1281,7 +1346,7 @@
                         var ids = items.filter(function (item) { return !playlistKeys[itemKey(item)]; }).map(function (item) { return item.Id; });
 
                         if (ids.length) {
-                            currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: ids }));
+                            currentStatus = normalizeStatus(await apiRequest("POST", "SmartShufflePlaylist/Items", { itemIds: ids }, selectedPlaylistParam()));
                             added += ids.length;
                         }
 
@@ -1313,6 +1378,12 @@
             el("sspResetBtn").addEventListener("click", resetProgress);
             el("sspSaveSettingsBtn").addEventListener("click", saveSettings);
             el("sspCleanupBtn").addEventListener("click", cleanupDuplicates);
+            el("sspCreatePlaylistBtn").addEventListener("click", createPlaylist);
+            el("sspSetActiveBtn").addEventListener("click", setActivePlaylist);
+            el("sspPlaylistSelect").addEventListener("change", function () {
+                selectedPlaylistId = this.value || "";
+                refresh();
+            });
             el("sspSearchBtn").addEventListener("click", function () {
                 search(el("sspSearchInput").value);
             });

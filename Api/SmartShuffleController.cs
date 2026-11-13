@@ -21,8 +21,8 @@ public sealed class SmartShuffleController : ControllerBase
         _service = service;
     }
 
-    [HttpGet("Status")]
-    public async Task<ActionResult<PlaylistStatus>> GetStatus(CancellationToken cancellationToken)
+    [HttpGet("Playlists")]
+    public async Task<ActionResult<PlaylistsOverview>> GetPlaylists(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == Guid.Empty)
@@ -30,13 +30,75 @@ public sealed class SmartShuffleController : ControllerBase
             return Unauthorized();
         }
 
-        var status = await _service.GetStatusAsync(userId, cancellationToken).ConfigureAwait(false);
-        return Ok(status);
+        return Ok(await _service.GetPlaylistsAsync(userId, cancellationToken).ConfigureAwait(false));
+    }
+
+    [HttpPost("Playlists")]
+    public async Task<ActionResult<PlaylistsOverview>> CreatePlaylist(
+        [FromBody] CreatePlaylistRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request?.Name))
+        {
+            return BadRequest("Playlist name is required.");
+        }
+
+        return Ok(await _service.CreateManagedPlaylistAsync(userId, request.Name, cancellationToken).ConfigureAwait(false));
+    }
+
+    [HttpPost("ActivePlaylist")]
+    public async Task<ActionResult<PlaylistsOverview>> SetActivePlaylist(
+        [FromBody] SetActivePlaylistRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        if (request?.PlaylistId == null || request.PlaylistId == Guid.Empty)
+        {
+            return BadRequest("Playlist id is required.");
+        }
+
+        return Ok(await _service.SetActivePlaylistAsync(userId, request.PlaylistId.Value, cancellationToken).ConfigureAwait(false));
+    }
+
+    [HttpGet("Status")]
+    public async Task<ActionResult<PlaylistStatus>> GetStatus([FromQuery] Guid? playlistId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            return Ok(await _service.GetStatusAsync(userId, playlistId, cancellationToken).ConfigureAwait(false));
+        }
+        catch (InvalidOperationException)
+        {
+            if (playlistId.HasValue)
+            {
+                return NotFound();
+            }
+
+            throw;
+        }
     }
 
     [HttpPost("Items")]
     public async Task<ActionResult<PlaylistStatus>> AddItems(
         [FromBody] AddItemsRequest? request,
+        [FromQuery] Guid? playlistId,
         CancellationToken cancellationToken)
     {
         var userId = GetUserId();
@@ -50,13 +112,12 @@ public sealed class SmartShuffleController : ControllerBase
             return BadRequest("No items were supplied.");
         }
 
-        await _service.AddItemsAsync(userId, request.ItemIds, cancellationToken).ConfigureAwait(false);
-        var status = await _service.GetStatusAsync(userId, cancellationToken).ConfigureAwait(false);
-        return Ok(status);
+        await _service.AddItemsAsync(userId, playlistId, request.ItemIds, cancellationToken).ConfigureAwait(false);
+        return Ok(await _service.GetStatusAsync(userId, playlistId, cancellationToken).ConfigureAwait(false));
     }
 
     [HttpDelete("Items/{itemId:guid}")]
-    public async Task<ActionResult<PlaylistStatus>> RemoveItem(Guid itemId, CancellationToken cancellationToken)
+    public async Task<ActionResult<PlaylistStatus>> RemoveItem(Guid itemId, [FromQuery] Guid? playlistId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == Guid.Empty)
@@ -64,13 +125,12 @@ public sealed class SmartShuffleController : ControllerBase
             return Unauthorized();
         }
 
-        await _service.RemoveItemAsync(userId, itemId, cancellationToken).ConfigureAwait(false);
-        var status = await _service.GetStatusAsync(userId, cancellationToken).ConfigureAwait(false);
-        return Ok(status);
+        await _service.RemoveItemAsync(userId, playlistId, itemId, cancellationToken).ConfigureAwait(false);
+        return Ok(await _service.GetStatusAsync(userId, playlistId, cancellationToken).ConfigureAwait(false));
     }
 
     [HttpPost("Reset")]
-    public async Task<ActionResult<PlaylistStatus>> Reset(CancellationToken cancellationToken)
+    public async Task<ActionResult<PlaylistStatus>> Reset([FromQuery] Guid? playlistId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == Guid.Empty)
@@ -78,13 +138,12 @@ public sealed class SmartShuffleController : ControllerBase
             return Unauthorized();
         }
 
-        await _service.ResetAsync(userId, cancellationToken).ConfigureAwait(false);
-        var status = await _service.GetStatusAsync(userId, cancellationToken).ConfigureAwait(false);
-        return Ok(status);
+        await _service.ResetAsync(userId, playlistId, cancellationToken).ConfigureAwait(false);
+        return Ok(await _service.GetStatusAsync(userId, playlistId, cancellationToken).ConfigureAwait(false));
     }
 
     [HttpPost("Cleanup")]
-    public async Task<ActionResult<PlaylistStatus>> Cleanup(CancellationToken cancellationToken)
+    public async Task<ActionResult<PlaylistStatus>> Cleanup([FromQuery] Guid? playlistId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == Guid.Empty)
@@ -92,8 +151,7 @@ public sealed class SmartShuffleController : ControllerBase
             return Unauthorized();
         }
 
-        var status = await _service.CleanupAsync(userId, cancellationToken).ConfigureAwait(false);
-        return Ok(status);
+        return Ok(await _service.CleanupAsync(userId, playlistId, cancellationToken).ConfigureAwait(false));
     }
 
     private Guid GetUserId()
@@ -106,4 +164,14 @@ public sealed class SmartShuffleController : ControllerBase
 public sealed class AddItemsRequest
 {
     public List<Guid> ItemIds { get; set; } = new();
+}
+
+public sealed class CreatePlaylistRequest
+{
+    public string Name { get; set; } = string.Empty;
+}
+
+public sealed class SetActivePlaylistRequest
+{
+    public Guid? PlaylistId { get; set; }
 }

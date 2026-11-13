@@ -40,16 +40,22 @@
         if (!window.ApiClient || !window.ApiClient.getJSON) {
             return Promise.reject(new Error('ApiClient unavailable'));
         }
+        var itemId = getItemIdFromRoute();
+        if (!itemId) {
+            return Promise.reject(new Error('No item route'));
+        }
         var now = Date.now();
-        if (statusPromise && now - statusFetchedAt < CACHE_MS) {
+        var cacheKey = itemId;
+        if (statusPromise && statusPromise._sspKey === cacheKey && now - statusFetchedAt < CACHE_MS) {
             return statusPromise;
         }
         statusFetchedAt = now;
-        statusPromise = window.ApiClient.getJSON(window.ApiClient.getUrl(STATUS_PATH)).catch(function (err) {
+        statusPromise = window.ApiClient.getJSON(window.ApiClient.getUrl(STATUS_PATH + '?playlistId=' + itemId)).catch(function (err) {
             statusPromise = null;
             statusFetchedAt = 0;
             throw err;
         });
+        statusPromise._sspKey = cacheKey;
         return statusPromise;
     }
 
