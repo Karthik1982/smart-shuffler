@@ -339,7 +339,8 @@
         }
 
         #smartShufflePage .ssp-field input[type="number"],
-        #smartShufflePage .ssp-field input[type="text"] {
+        #smartShufflePage .ssp-field input[type="text"],
+        #smartShufflePage select {
             padding: 0.45rem 0.6rem;
             border-radius: 6px;
             border: 1px solid var(--ssp-border);
@@ -348,9 +349,15 @@
             font-size: 0.9rem;
         }
 
-        #smartShufflePage .ssp-field input:focus {
+        #smartShufflePage .ssp-field input:focus,
+        #smartShufflePage select:focus {
             outline: 2px solid var(--ssp-blue);
             outline-offset: 1px;
+        }
+
+        #smartShufflePage select option {
+            background: #2b2b2b;
+            color: #fff;
         }
 
         #smartShufflePage .ssp-check {
@@ -411,7 +418,7 @@
                 <section class="ssp-card" style="margin-bottom:1rem;">
                     <h2 style="margin-bottom:.5rem;">Manage playlists</h2>
                     <div class="ssp-search-row" style="flex-wrap:wrap;align-items:center;">
-                        <select id="sspPlaylistSelect" style="flex:1;min-width:220px;padding:.5rem .7rem;border-radius:6px;border:1px solid var(--ssp-border);background:rgba(128,128,128,.08);color:inherit;"></select>
+                        <select id="sspPlaylistSelect" style="flex:1;min-width:220px;padding:.5rem .7rem;border-radius:6px;border:1px solid var(--ssp-border);background:#2b2b2b;color:#fff;"></select>
                         <button id="sspSetActiveBtn" type="button" class="ssp-secondary">Set active</button>
                         <button id="sspDeletePlaylistBtn" type="button" class="ssp-danger">Delete</button>
                     </div>
