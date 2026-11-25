@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="SmartShufflerLogo/Darkmode.jpg">
+    <source media="(prefers-color-scheme: light)" srcset="SmartShufflerLogo/LightMode.jpg">
+    <img alt="Smart Shuffle Playlist logo" src="SmartShufflerLogo/LightMode.jpg" width="400">
+  </picture>
+</p>
+
 # Smart Shuffle Playlist
 
 Shuffle only what you haven’t watched—then start fresh when the cycle’s complete.
